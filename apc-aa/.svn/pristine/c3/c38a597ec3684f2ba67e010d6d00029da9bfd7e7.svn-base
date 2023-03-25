@@ -1,0 +1,211 @@
+<?php
+/**
+ *
+ *   sid expected - slice_id where to search
+ *   var_id expected - id of variable in calling form, which should be filled
+ *   mode expected - which buttons to show ([A][M][B] - 'add' 'add mutual' 'add backward'
+ *   design expected - boolean - use standard or admin design
+ *
+ * PHP version 7.2+
+ *
+ * LICENSE: This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program (LICENSE); if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ * @version   $Id$
+ * @author    Honza Malik <honza.malik@ecn.cz>
+ * @license   http://opensource.org/licenses/gpl-license.php GNU Public License
+ * @copyright Copyright (C) 1999, 2000 Association for Progressive Communications
+ * @link      https://www.apc.org/ APC
+ *
+*/
+
+
+$save_hidden = true;   // do not delete r_hidden session variable in init_page!
+
+require_once __DIR__."/../include/init_page.php3";
+require_once __DIR__."/../include/varset.php3";
+require_once __DIR__."/../include/view.php3";
+require_once __DIR__."/../include/item.php3";
+require_once __DIR__."/../include/feeding.php3";
+require_once __DIR__."/../include/itemfunc.php3";
+require_once __DIR__."/../include/notify.php3";
+require_once __DIR__."/../include/searchlib.php3";
+require_once __DIR__."/../include/formutil.php3";
+require_once __DIR__."/../include/util.php3";
+
+
+/** RELATED SELECTION WINDOW - managed by MANAGER CLASS */
+
+/* use stored values from session, if we call related window
+   for secnd time (eg. after search or filtering data) */
+if ( isset($r_state) && !$_GET['sid'])  {
+//  $sid         = $r_state['related']['sid'];
+    $mode        = $r_state['related']['mode'];
+    $var_id      = $r_state['related']['var_id'];
+    $design      = $r_state['related']['design'];
+    $frombins    = $r_state['related']['frombins'];
+//  $conds_ro    = $r_state['related']['conds_ro'];
+//  $conds_rw    = $r_state['related']['conds_rw'];
+    $slice_field = $r_state['related']['slice_field'];
+}
+
+// id of the editted module (id in long form (32-digit hexadecimal number))
+$related_sid = get_if( $_GET['sid'], $r_state['related']['sid'] );
+$slice       = AA_Slice::getModule($related_sid);
+
+if (!$slice) {
+    echo "Error - no slice found<br>";
+    echo "<hr>sid<br>";
+    print_r($sid);
+    echo "<hr>r_state<br>";
+    print_r($r_state);
+    echo "<hr><br>";
+    print_r($_GET);
+    echo "<hr>GET<br>";
+    print_r($_GET);
+    echo "<hr>SESSION<br>";
+    print_r($_SESSION);
+    echo "<hr>POST<br>";
+    print_r($_POST);
+    exit;
+}
+
+/* prepare view format for manager class */
+if (!$mode )        { $mode        ='AMB'; }
+if (!$slice_field ) { $slice_field ='_#HEADLINE'; }
+
+for ( $i=0, $ino=strlen($mode); $i<$ino; ++$i) {
+    $m1 = substr($mode,$i,1);
+    $mode_string .= "&nbsp;<a href=\"javascript:SelectRelations('$var_id','".$TPS['AMB'][$m1]['tag']."','".$TPS['AMB'][$m1]['prefix']."','".$TPS['AMB'][$m1]['tag']."_#ITEM_ID_','{safe:{javascript:{expand:".$slice_field."}}}')\">". _m($TPS['AMB'][$m1]['str']) ."</a>&nbsp;";
+}
+
+$aliases = $slice->aliases();
+// special alias - will be automaticaly added as last column in manager view
+$aliases["_#AA_ACTIO"] = GetAliasDef( "f_t:$mode_string", "id..............");
+
+$manager_vid = null;
+$format      = null;   //default manager format will be used (and _#AA_ACTIO alias expanded)
+
+if ($design) {
+    if (ctype_digit((string)$design)) {
+        if ($design==1) {
+            $format  = $slice->get_format_strings();
+            // replace the checkbox with "action selection links"
+
+            // remove links
+            $format["odd_row_format"] = preg_replace('~</?a[^>]*>~is', '', $format['odd_row_format']);
+            // add action buttons (links)
+            $format["odd_row_format"] = preg_replace('~<input[^>]*checkbox[^>]*chb\[x_#ITEM_ID[^>]*>~i', $mode_string, $format['odd_row_format']);
+        } else {
+            $manager_vid = $design;
+        }
+    } else {
+        $format['odd_row_format']  = '<tr class="tabtxt"><td>'.$design.'</td></tr>';
+        $format['compact_top']     = '<table border="0" cellspacing="0" cellpadding="0" bgcolor="#F5F0E7" width="100%">';
+        $format['compact_bottom']  = '</table>';
+    }
+} else {  // '' or '0'
+    $format['odd_row_format']  = '<tr class="tabtxt"><td>_#PUB_DATE&nbsp;</td><td>{'.$slice_field.'}</td><td>_#AA_ACTIO</td></tr>';
+    $format['compact_top']     = '<table border="0" cellspacing="0" cellpadding="0" bgcolor="#F5F0E7" width="100%">
+                <tr><th>'._m("Publish date").'</th><th>'._m("Headline").'</th><th>'._m("Actions").'</th></tr>';
+    $format['compact_bottom']  = '</table>';
+}
+
+$conds_ro = String2Conds( rawurldecode($showcondsro) );
+$conds_rw = String2Conds( rawurldecode($showcondsrw) );
+
+$manager_settings = [
+     'module_id' => $related_sid,
+     'show'      =>  MGR_ALL & ~MGR_ACTIONS,    // MGR_ACTIONS | MGR_SB_SEARCHROWS | MGR_SB_ORDERROWS | MGR_SB_BOOKMARKS | MGR_SB_ALLTEXT | MGR_SB_ALLNUM
+     'searchbar'  => [
+         'fields'               => $slice->getSearchfields(),
+         'search_row_count_min' => 1,
+         'order_row_count_min'  => 1,
+         'add_empty_search_row' => true,
+         'function'             => false  // name of function for aditional action hooked on standard filter action
+     ],
+     'scroller'  => [
+         'listlen'              => ($listlen ? $listlen : EDIT_ITEM_COUNT)
+     ],
+     'itemview'  => [
+         'manager_vid'          => $manager_vid,    // $slice_info['manager_vid'],      // id of view which controls the design
+         'format'               => $format,
+         'fields'               => $slice->getFields()->getRecordArray(),
+         'aliases'              => $aliases,
+         'get_content_funct'    => 'GetItemContent'
+     ],
+     'messages'  => [
+         'title'       => _m("Editor window - item manager, related selection window")
+     ]
+];
+
+$manager = new AA_Manager('related'. $related_sid, $manager_settings);
+if ((isset($conds_ro)) && (isset($showcondsro))) {
+    $manager->searchbar->addSearch($conds_ro, true);
+}
+if ((isset($conds_rw)) && (isset($showcondsrw))) {
+    $manager->searchbar->addSearch($conds_rw);
+}
+
+// r_state array holds all configuration of Links Manager
+// the configuration then could be Bookmarked
+if ( !isset($r_state['related']) OR $_GET['sid'] OR ($r_state['related']['sid'] != $related_sid)) {
+//    huhl(" 1:", $r_state['related'], " sid:",$_GET['sid'] , " m:",$r_state['related']['module_id'], " mi:",$module_id);
+    // we are here for the first time or we are switching to another slice
+    unset($r_state['related']);
+    // set default admin interface settings from user's profile
+    // $r_state["module_id"]         = $related_sid;
+    // $r_state['bin']               = 'app';
+    $frombins = get_if( $frombins, AA_BIN_ACTIVE | AA_BIN_PENDING ) ;
+    $r_state['related']['sid']       = $related_sid;
+    $r_state['related']['mode']      = $mode;
+    $r_state['related']['var_id']    = $var_id;
+    $r_state['related']['design']    = $design;
+    $r_state['related']['frombins']  = $frombins;
+//    $r_state['related']['conds_ro'] = $conds_ro;
+//    $r_state['related']['conds_rw'] = $conds_rw;
+    $r_state['related']['slice_field'] = $slice_field;
+}
+
+if ($r_state['related']['manager'] ) {        // do not set state for the first time calling
+    $manager->setFromState($r_state['related']['manager']);
+}
+
+$manager->performActions();
+
+$manager->printHtmlPageBegin(true);  // html, head, css, title, javascripts
+FrmJavascriptFile('javascript/js_lib.min.js?v='.AA_JS_VERSION);
+FrmJavascriptFile('javascript/inputform.min.js?v='.AA_JS_VERSION);  // for SelectRelations() function
+
+$zids = $manager->getSet()->setBins($frombins)->query();
+
+$manager->printSearchbarBegin();
+$manager->printSearchbarEnd();   // close the searchbar form
+
+$manager->printAndClearMessages();
+PrintArray($r_err);
+PrintArray($r_msg);
+unset($r_err);
+unset($r_msg);
+
+$manager->printItems($zids);   // print links and actions
+$r_state['related']['manager'] = $manager->getState();
+
+echo '<table width="100%" border="0" cellspacing="0" cellpadding="1" bgcolor="'. COLOR_TABTITBG ."\" align=\"center\">
+<tr><td align=\"center\"><input type=\"button\" value='". _m("Back") ."' onclick='window.close()'></td></tr></table>";
+
+HtmlPageEnd();
+page_close();
+
+

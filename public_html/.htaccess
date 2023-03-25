@@ -1,0 +1,27 @@
+#ErrorDocument 404 /404.php
+
+<IfModule mod_rewrite.c>
+  RewriteEngine on
+
+  RewriteCond %{THE_REQUEST} etc/passwd [NC,OR]
+  RewriteCond %{THE_REQUEST} \*http [NC,OR]
+  RewriteCond %{THE_REQUEST} script [NC]
+ # RewriteRule . error.html [L]
+
+  RewriteCond %{HTTP_HOST} .
+ RewriteCond %{HTTP_HOST} !^poliniza\.redescomunitarias\.co
+ RewriteRule (.*) https://poliniza.redescomunitarias.co/$1 [R=301,L]
+  
+### versión movil/mobile version###
+RewriteCond %{HTTP_USER_AGENT} "android|blackberry|googlebot-mobile|iemobile|ipad|iphone|ipod|opera mobile|palmos|webos" [NC]
+RewriteRule ^$ /apc-aa/modules/site/site.php3?site_id=24cd56551d26d8674a1b4081aede5783	[L,QSA]
+
+RewriteCond %{HTTP_USER_AGENT} "android|blackberry|googlebot-mobile|iemobile|ipad|iphone|ipod|opera mobile|palmos|webos" [NC]
+RewriteRule ^(en|cz|es).*$ /apc-aa/modules/site/site.php3?site_id=24cd56551d26d8674a1b4081aede5783  [L,QSA]
+##################################
+  
+  RewriteRule ^$ /apc-aa/modules/site/site.php3?site_id=24cd56551d26d8674a1b4081aede5783 [L,QSA]
+  RewriteRule ^(enm|czm|esm|es2m).*$ /apc-aa/modules/site/site.php3?site_id=24cd56551d26d8674a1b4081aede5783 [L,QSA]
+  RewriteRule ^(en|cz|es).*$ /apc-aa/modules/site/site.php3?site_id=24cd56551d26d8674a1b4081aede5783 [L,QSA]
+</IfModule>
+

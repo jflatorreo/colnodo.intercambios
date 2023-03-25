@@ -1,0 +1,54 @@
+{
+  "name": "apc/actionapps",
+  "description": "ActionApps is a collaborative web publishing tool and an open-source development platform for web applications.",
+  "keywords": ["CMS"],
+  "type": "project",
+  "homepage": "https://actionapps.org",
+  "license": "GPL-2.0-or-later",
+  "authors": [
+        {
+            "name": "Honza Malik",
+            "email": "honza.malik@ecn.cz",
+            "homepage": "https://ecnstudio.cz",
+            "role": "Developer"
+        }
+  ],
+  "repositories": [
+    {
+      "type": "vcs",
+      "url": "https://github.com/honzito/phpThumb.git"
+    }
+  ],
+  "require": {
+    "php": ">=7.2",
+    "ext-json": "*",
+    "ext-ctype": "*",
+    "firebase/php-jwt": "v5.0.0",
+    "mobiledetect/mobiledetectlib": "2.8.33",
+    "phpgangsta/googleauthenticator": "dev-master",
+    "ext-iconv": "*",
+    "ext-zlib": "*",
+    "ext-gd": "*",
+    "ext-mbstring": "*",
+    "ext-dom": "*",
+    "ext-xsl": "*",
+    "ext-simplexml": "*",
+    "ext-xml": "*"
+  },
+  "suggest": {
+    "ext-ldap": "*",
+    "ext-openssl": "*",
+    "ext-apache": "*",
+    "ext-mysqli": "*"
+  },
+  "autoload": {
+    "psr-4": {
+      "AA\\": "src/"
+    },
+    "classmap": ["include/"],
+    "exclude-from-classmap": ["include/custom/"]
+  },
+  "config": {
+    "discard-changes": true
+  }
+}
